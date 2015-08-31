@@ -1,6 +1,7 @@
 import xlsxwriter
 import csv
 import glob
+from xlsxwriter.utility import xl_col_to_name
 
 #Read a csv file and create graphs
 
@@ -68,7 +69,7 @@ ERICSSON_GRAPHS = [
 			([15],[16],5,"Volumen de SHO y Tasa de exito de SHO"),
 			([17],[18],6,"Volumen de IFHO y Tasa de Fallos de IFHO")
 		]
-			
+OFFSET = 2 #Difference between columns in Metricas_Datos and Helper Table.
 			
 
 
@@ -78,13 +79,18 @@ for file_name in csv_file_list:
 	file_name_no_ext = file_name_split[0]
 
 	wb = xlsxwriter.Workbook(file_name_no_ext+".xlsx", {'strings_to_numbers':  True})
-	ws = wb.add_worksheet("Metricas_Datos")
+	ws = wb.add_worksheet("Metricas_Datos") #Holds csv data
+	helper_sheet = wb.add_worksheet("Helper Table") #Calculates pre and post ANR averages.
 
 	with open(file_name, "r") as csv_file:
 		csv_reader = csv.reader(csv_file)
 		number_of_rows = 0
+		header = []
+		time_col = []
 		for i,row in enumerate(csv_reader):
-			#Could store the values here into some lists, to process later.
+			time_col.append(row[0])
+			if i==0:
+				header = row
 			clean_row = []
 			for element in row:
 				if element=="None":
@@ -95,9 +101,17 @@ for file_name in csv_file_list:
 		else:
 			number_of_rows = i+1
 			number_of_columns = len(row)
+			helper_sheet.write_column(0,0,time_col)
 		
 		for info in ERICSSON_GRAPHS:
 			makeChart(wb,ws,info,number_of_rows)
-
+		
+		header = [header[0]] + ["ANR Execution", "ANR Execution", "ANR avg"] + header[2:]
+		helper_sheet.write_row(0,0,header)
+		avg_if_formula = "=AVERAGEIF($D:$D,$D{0},Metricas_Datos!{1}:{1})"
+		for row in range(1,number_of_rows):
+			for col in range(2,number_of_columns):
+				col_letter = xl_col_to_name(col)
+				helper_sheet.write(row,col+OFFSET,avg_if_formula.format(row+1,col_letter))
 
 	wb.close()
